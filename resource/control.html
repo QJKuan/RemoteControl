@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>遥控器</title>
+    <style>
+        body {
+            touch-action: manipulation;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+        .remote-control{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 360px;
+        }
+        .remote-control button {
+            padding: 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 40%; /* 修改为50% */
+            background-color: #007bff;
+            color: white;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+            /* 添加以下属性以保持宽高相等 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 1 / 1; /* 保持1:1的宽高比 */
+            /*禁止长按出现复制*/
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        /* 移动端按下按钮后按钮不会回弹 添加 button:active 即可 */
+        .remote-control button:active  {
+            background-color: #0056b3;
+        }
+        @media (max-width: 600px) {
+            .remote-control button {
+                font-size: 14px;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="remote-control">
+    <button data-command="volumeDown">减小音量</button>
+    <button data-command="volumeUp">增大音量</button>
+    <button data-command="pause">暂停</button>
+    <button data-command="mute">静音</button>
+    <button data-command="previous">后退</button>
+    <button data-command="next">快进</button>
+    <button data-command="lastLevel">上一集</button>
+    <button data-command="nextLevel">下一集</button>
+</div>
+<script>
+    // 设置当前 IP
+    const serviceIP = "{{ .ServiceIP }}";
+
+    // 防止 Safari浏览器 双击放大
+    window.onload=function () {
+        document.ondblclick = function(e) {
+            e.preventDefault();
+        }
+    }
+
+    const buttons = document.querySelectorAll('.remote-control button');
+    const intervals = {}; // 存储每个按钮的interval ID
+
+    buttons.forEach(button => {
+        let longPressTimer;
+        let isLongPressing = false;
+
+        function handleStart(e) {
+            if (e.type === 'mousedown' && e.button !== 0) return; // 只处理左键按下
+            // e.preventDefault();
+
+            longPressTimer = setTimeout(() => {
+                if (!isLongPressing) {
+                    isLongPressing = true;
+                    // 启动定时器，每隔500ms发送请求
+                    intervals[button] = setInterval(() => {
+                        sendCommand(button.getAttribute('data-command'));
+                    }, 300);
+                }
+            }, 500);
+        }
+
+        function handleEnd(e) {
+            clearTimeout(longPressTimer);
+            if (isLongPressing) {
+                isLongPressing = false;
+                clearInterval(intervals[button]);
+                delete intervals[button];
+            }
+        }
+
+        button.addEventListener('mousedown', handleStart);
+        button.addEventListener('touchstart', handleStart);
+        button.addEventListener('mouseup', handleEnd);
+        button.addEventListener('touchend', handleEnd);
+        button.addEventListener('mouseleave', handleEnd);
+
+        // 处理点击事件（非长按）
+        button.addEventListener('click', (e) => {
+            if (!isLongPressing) {
+                sendCommand(button.getAttribute('data-command'));
+            }
+        });
+    });
+
+    function sendCommand(command) {
+        // 替换为你的后端API URL
+        const apiUrl = `http://${serviceIP}:9090/${command}`;
+
+        // 发送GET请求
+        fetch(apiUrl, {
+            method: 'GET'
+        })
+            .then(response => {
+                if (response.ok) {
+                    console.log(`命令 ${command} 发送成功`);
+                } else {
+                    console.error(`命令 ${command} 发送失败`);
+                }
+            })
+            .catch(error => {
+                console.error('请求出错:', error);
+            });
+    }
+
+</script>
+</body>
+</html>
